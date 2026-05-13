@@ -1,0 +1,31 @@
+# Default: Linux style repo
+* text eol=lf
+
+# C++ source
+*.cpp text eol=lf
+*.h   text eol=lf
+*.hpp text eol=lf
+
+# Build systems
+CMakeLists.txt text eol=lf
+
+# Visual Studio project files
+# (Windows tooling expects CRLF)
+*.sln    text eol=crlf
+*.vcxproj text eol=crlf
+*.filters text eol=crlf
+*.user    text eol=crlf
+
+# Scripts
+*.sh  text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.exe binary
+*.obj binary
+*.pdb binary
+*.ilk binary
+*.idb binary
+*.tlog binary
+*.recipe binary
