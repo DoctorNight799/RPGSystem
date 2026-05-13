@@ -1,0 +1,8 @@
+build/
+bin/
+out/
+.vs/
+.idea/
+*.exe
+*.obj
+*.pdb
