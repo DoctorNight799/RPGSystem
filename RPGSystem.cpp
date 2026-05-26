@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 using namespace std;
 
@@ -15,9 +16,34 @@ public:
 
 	void attack(Entity& c);
 
-	void rollInitiative() {
-		initiative = rand() % 6;
+	void setInitiative() {
+		initiative = rand() % 6 + 1;
 	}
+};
+
+
+bool initiativeComp(const Entity& a, const Entity& b) {
+	if (a.initiative == b.initiative) {
+		int rerollA = rand() % 6 + 1;
+		int rerollB = rand() % 6 + 1;
+		return rerollA > rerollB;
+	}
+	return a.initiative > b.initiative;
+}
+
+class  BattleManager {
+public:
+	void rollInitiatve() {
+		for (auto& e : entities)
+			e.setInitiative();
+		sort(entities.begin(), entities.end(), initiativeComp);
+	}
+
+	void addEntity(Entity e) {
+		entities.push_back(e);
+	}
+private:
+	vector<Entity> entities;
 };
 
 void Entity::attack(Entity& c) {
@@ -34,9 +60,9 @@ int main() {
 	srand(time({}));
 	Entity c1("1", 20, 5);
 	Entity c2("2", 20, 10);
-
-	if (c1.initiative > c2.initiative)
-		c1.attack(c2);
-	else
-		c2.attack(c1);
+	BattleManager manager;
+	manager.addEntity(c1);
+	manager.addEntity(c2);
+	manager.rollInitiatve();
+	
 }
