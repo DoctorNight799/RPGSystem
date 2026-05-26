@@ -4,30 +4,39 @@
 
 using namespace std;
 
-class Person {
+class Entity {
 public:
 	int hp;
 	int dmg;
+	int initiative;
+	string name;
 
-	Person(int _hp, int _dmg) : hp(_hp), dmg(_dmg) {}
+	Entity(string _name, int _hp, int _dmg) : name(_name), hp(_hp), dmg(_dmg) {}
 
-	void attack(Person& c);
+	void attack(Entity& c);
+
+	void rollInitiative() {
+		initiative = rand() % 6;
+	}
 };
 
-void Person::attack(Person& c) {
+void Entity::attack(Entity& c) {
 	if (c.hp > 0)
+	{
 		c.hp -= dmg;
+		cout << c.name << " took " << dmg << " dmg\n";
+	}
 	else
-		cout << "Target is dead\n";
-	cout << "ATTACK!\n";
+		cout << c.name << " is dead\n";
 }
 
 int main() {
-	Person c1(20, 5);
-	Person c2(20, 10);
+	srand(time({}));
+	Entity c1("1", 20, 5);
+	Entity c2("2", 20, 10);
 
-	c2.attack(c1);
-	c2.attack(c1);
-	c2.attack(c1);
-	c2.attack(c1);
+	if (c1.initiative > c2.initiative)
+		c1.attack(c2);
+	else
+		c2.attack(c1);
 }
