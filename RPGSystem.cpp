@@ -6,6 +6,8 @@
 
 using namespace std;
 
+const int teamNum = 10;
+
 class Entity {
 public:
 	int hp;
@@ -51,27 +53,44 @@ public:
 	}
 
 	void playerTurn(Entity& player) {
-		cout << "Список целей:\n";
-		int index = 1;
-		vector<Entity*> targets;
-		for (auto& e : entities) {
-			if (e.teamId != player.teamId && e.hp > 0) {
-				cout << index++ << ". " << e.name << " (HP: " << e.hp << ")\n";
-				targets.push_back(&e);
+		int num;
+		bool action{ false };
+		while (action == false) {
+			cout << "1.Атака\n2.Способность\n3.Магия\n4.Предметы\n5.Побег\nВыберите действие: ";
+			cin >> num;
+			switch (num) {
+				case 1:
+				{
+					cout << "Список целей:\n";
+					int index = 1;
+					vector<Entity*> targets;
+					for (auto& e : entities) {
+						if (e.teamId != player.teamId && e.hp > 0) {
+							cout << index++ << ". " << e.name << " (HP: " << e.hp << ")\n";
+							targets.push_back(&e);
+						}
+					}
+					if (targets.empty()) return;
+
+					cout << "Выберите цель для атаки: ";
+					int choice;
+					cin >> choice;
+					cin.ignore();
+
+					if (choice >= 1 && choice <= targets.size()) {
+						targets[choice - 1]->takeDamage(player.dmg);
+						cout << "Player dealt " << player.dmg << " damage to " << targets[choice - 1]->name << '\n';
+					}
+					cout << endl;
+					action = true;
+					break;
+				}
+				default: {
+					cout << "Incorrect action\n\n";
+				}
 			}
 		}
-		if (targets.empty()) return;
-
-		cout << "Выберите цель для атаки: ";
-		int choice;
-		cin >> choice;
-		cin.ignore();
-
-		if (choice >= 1 && choice <= targets.size()) {
-			targets[choice - 1]->takeDamage(player.dmg);
-			cout << "Player dealt " << player.dmg << " damage to " << targets[choice-1]->name << '\n';
-		}
-		cout << endl;
+		
 	}
 
 	void aiTurn(Entity& current) {
@@ -86,7 +105,7 @@ public:
 	}
 
 	bool isBattleOver() {
-		bool teamsAlive[10] = { false };
+		bool teamsAlive[teamNum] = { false };
 		int aliveTeams = 0;
 
 		for (auto& e : entities) {
