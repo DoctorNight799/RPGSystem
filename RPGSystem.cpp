@@ -6,15 +6,25 @@
 
 using namespace std;
 
-const int teamNum = 10;
-
 enum SpellType {
 	HEAL,
 	DAMAGE,
 	EFFECT
 };
 
+enum EffectType {
+	PERIODIC, // heal, damage
+	CONTROL // оглушение, восприимчивость и др
+};
+
 class Entity;
+
+class Effect {
+	int duration;
+	int value;
+	EffectType type;
+	void apply(Entity& target);
+};
 
 class Spell {
 public:
@@ -22,28 +32,25 @@ public:
 	int value;
 	int manaCost;
 	SpellType type;
+	vector<Effect> effects;
 	Spell(string _name, int _manaCost, int _value, SpellType _type) : name(_name), manaCost(_manaCost), value(_value), type(_type) {}
 	void cast(Entity& caster, Entity& target);
 };
 
 class Entity {
 public:
+	string name;
 	int hp;
 	int maxHp;
 	int mana;
 	int maxMana;
 	int dmg;
-	int initiative;
-	int teamId; // 0 - player + allies, 1 - enemies and other
-	string name;
+	int teamId; // 0 - player + allies, 1 - enemies and so on
 	bool isPlayer = false;
+	int initiative;
 	vector<Spell> spells;
 
-	// Конструктор игрока
-	Entity(string _name, int _hp, int _mana, int _dmg, int _teamId, bool player) : name(_name), hp(_hp), mana(_mana), dmg(_dmg), teamId(_teamId), isPlayer(player) { maxHp = _hp; maxMana = _mana; }
-
-	// AI конструктор (maxHp и maxMana в отдельных конструкторах потом настроить.)
-	Entity(string _name, int _hp, int _dmg, int _teamId) : name(_name), hp(_hp), dmg(_dmg), teamId(_teamId) { maxHp = _hp; }
+	Entity(string _name, int _hp = 100, int _mana = 100, int _dmg = 10, int _teamId = 1, bool player = false) : name(_name), hp(_hp), maxHp(_hp), mana(_mana), maxMana(_mana), dmg(_dmg), teamId(_teamId), isPlayer(player) {}
 
 	void takeDamage(int _dmg) {
 		if (hp > 0) {
@@ -88,10 +95,89 @@ public:
 		entities.push_back(e);
 	}
 
+	void startBattle() {
+		hasEscaped = false;
+		rollInitiatve();
+		while (!isBattleOver() && !hasEscaped) {
+			for (auto& e : entities) {
+				if (e.hp <= 0) continue;
+
+				if (e.isPlayer)
+					playerTurn(e);
+				else
+					aiTurn(e);
+
+				if (isBattleOver()) break;
+				if (hasEscaped) {
+					cout << "Бой окончен.\n";
+					return;
+				}
+			}
+		}
+		for (auto& e : entities) {
+			if (e.hp > 0) {
+				cout << "Бой окончен. Победитель: " << e.name << '\n';
+				break;
+			}
+		}
+	}
+private:
+	vector<Entity> entities;
+	bool hasEscaped;
+
 	void rollInitiatve() {
 		for (auto& e : entities)
 			e.setInitiative();
 		sort(entities.begin(), entities.end(), initiativeComp);
+	}
+
+	int getAliveEnemies(int teamId) {
+		int count = 0;
+		for (auto& e : entities) {
+			if (e.teamId != teamId && e.hp > 0)
+				count++;
+		}
+		return count;
+	}
+
+	Entity* selectTarget(int teamId, bool enemy) {
+		cout << "Список целей:\n";
+		int index = 1;
+		vector<Entity*> targets;
+		for (auto& e : entities) {
+			if (enemy) {
+				if (e.teamId != teamId && e.hp > 0) {
+					cout << index++ << ". " << e.name << " (" << e.hp << " HP)\n";
+					targets.push_back(&e);
+				}
+			}
+			else {
+				if (e.teamId == teamId && e.hp > 0) {
+					cout << index++ << ". " << e.name << " (" << e.hp << " HP)\n";
+					targets.push_back(&e);
+				}
+			}
+		}
+		if (targets.empty()) return nullptr;
+		int ch = 0;
+		while (true) {
+			cout << "Выберите цель: ";
+			cin >> ch;
+			if (ch >= 1 && ch <= targets.size())
+				return targets[ch - 1];
+			cout << "Неправильная цель\n";
+		}
+	}
+
+	void displaySpells(Entity& caster) {
+		if (caster.spells.empty()) {
+			cout << "У вас нет заклинаний\n";
+			return;
+		}
+
+		int index = 1;
+		for (auto& s : caster.spells)
+			cout << index++ << ". " << s.name << ' ' << s.manaCost << " MP\n";
 	}
 
 	void playerTurn(Entity& player) {
@@ -100,82 +186,69 @@ public:
 		while (action == false) {
 			cout << "1. Атака\n2. Способность\n3. Магия\n4. Предметы\n5. Побег\nВыберите действие: ";
 			cin >> num;
+			if (cin.fail()) {
+				cin.clear();
+				cin.ignore(1000, '\n');
+			}
 			switch (num) {
-				case 1:
-				{
-					cout << "Список целей:\n";
-					int index = 1;
-					vector<Entity*> targets;
-					for (auto& e : entities) {
-						if (e.teamId != player.teamId && e.hp > 0) {
-							cout << index++ << ". " << e.name << " (HP: " << e.hp << ")\n";
-							targets.push_back(&e);
-						}
-					}
-					if (targets.empty()) return;
+			case 1:
+			{
+				Entity* target = selectTarget(0, true);
+				if (target) {
+					target->takeDamage(player.dmg);
+					cout << "Player dealt " << player.dmg << " damage to " << target->name << '\n';
+				}
+				else {
+					cout << " Нет доступных целей\n";
+				}
+				cout << endl;
+				action = true;
+				break;
+			}
+			case 3:
+			{
+				displaySpells(player);
 
-					cout << "Выберите цель для атаки: ";
-					int choice;
-					cin >> choice;
-
-					if (choice >= 1 && choice <= targets.size()) {
-						targets[choice - 1]->takeDamage(player.dmg);
-						cout << "Player dealt " << player.dmg << " damage to " << targets[choice - 1]->name << '\n';
-					}
-					cout << endl;
-					action = true;
+				cout << "Выберите заклинание для использования: ";
+				int spellChoice;
+				cin >> spellChoice;
+				if (spellChoice < 1 || spellChoice > player.spells.size()) {
+					cout << "Неправильное заклинание\n";
 					break;
 				}
-				case 3:
-				{
-					if (player.spells.empty()) {
-						cout << "У вас нет заклинаний.\n";
-						break;
-					}
-					cout << "Список заклинаний:\n";
-					int index = 1;
-					for (auto s : player.spells)
-						cout << index++ << ". " << s.name << ' ' << s.manaCost << " MP\n";
 
-					cout << "Выберите заклинание для использования: ";
-					int spellChoice;
-					cin >> spellChoice;
-					if (spellChoice < 1 || spellChoice > player.spells.size()) {
-						cout << "Неправильное заклинание\n";
-						break;
-					}
+				if (player.spells[spellChoice - 1].type == DAMAGE) {
+					Entity* target = selectTarget(0, true);
+					player.spells[spellChoice - 1].cast(player, *target);
+				}
 
-					cout << "Список целей:\n";
-					index = 1;
-					vector<Entity*> targets;
-					for (auto& e : entities) {
-						if(player.spells[spellChoice-1].type == DAMAGE)
-							if (e.teamId != player.teamId && e.hp > 0) {
-								cout << index++ << ". " << e.name << " (HP: " << e.hp << ")\n";
-								targets.push_back(&e);
-							}
-						if (player.spells[spellChoice - 1].type == HEAL)
-							if (e.teamId == player.teamId && e.hp > 0) {
-								cout << index++ << ". " << e.name << " (HP: " << e.hp << ")\n";
-								targets.push_back(&e);
-							}
-					}
-					if (targets.empty()) return;
+				if (player.spells[spellChoice - 1].type == HEAL) {
+					Entity* target = selectTarget(0, false);
+					player.spells[spellChoice - 1].cast(player, *target);
+				}
 
-					cout << "Выберите цель для атаки: ";
-					int choice;
-					cin >> choice;
-					if (choice >= 1 && choice <= targets.size())
-						player.spells[spellChoice - 1].cast(player, *targets[choice-1]);
+				action = true;
+				break;
+			}
+			case 5: {
+				cout << "Вы пытаетесь сбежать..\n";
+				int chance = 50 - (getAliveEnemies(0) * 10);
+				if (chance < 10) chance = 10;
+				if (rand() % 100 < chance) {
+					cout << "Вы успешно сбежали!\n";
 					action = true;
-					break;
+					hasEscaped = true;
 				}
-				default: {
-					cout << "Incorrect action\n\n";
+				else {
+					cout << "У вас не получилось сбежать.\n";
+					action = true;
 				}
+				break;
+			}
+			default:
+				cout << "Incorrect action\n" << endl;
 			}
 		}
-		
 	}
 
 	void aiTurn(Entity& current) {
@@ -190,42 +263,12 @@ public:
 	}
 
 	bool isBattleOver() {
-		bool teamsAlive[teamNum] = { false };
-		int aliveTeams = 0;
-
-		for (auto& e : entities) {
-			if (e.hp > 0 && !teamsAlive[e.teamId]) {
-				teamsAlive[e.teamId] = true;
-				aliveTeams++;
-				if (aliveTeams > 1) return false;
-			}
-		}
-		return true;
+		set<int> teamsCount;
+		for (auto& e : entities)
+			if (e.hp > 0)
+				teamsCount.insert(e.teamId);
+		return teamsCount.size() <= 1;
 	}
-
-	void startBattle() {
-		rollInitiatve();
-		while (!isBattleOver()) {
-			for (auto& e : entities) {
-				if (e.hp <= 0) continue;
-
-				if (e.isPlayer)
-					playerTurn(e);
-				else
-					aiTurn(e);
-
-				if (isBattleOver()) break;
-			}
-		}
-		for (auto& e : entities) {
-			if (e.hp > 0) {
-				cout << "Бой окончен. Победитель: " << e.name << '\n';
-				break;
-			}
-		}
-	}
-private:
-	vector<Entity> entities;
 };
 
 int main() {
@@ -239,7 +282,7 @@ int main() {
 	Entity player("Player", 20, 100, 10, 0, true);
 	player.spells.push_back(fireball);
 	player.spells.push_back(smallHeal);
-	Entity enemy("Enemy", 20, 10, 1);
+	Entity enemy("Enemy", 20, 0, 10);
 
 	BattleManager manager;
 
