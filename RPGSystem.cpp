@@ -32,10 +32,19 @@ public:
 	int value;
 	int manaCost;
 	SpellType type;
+	bool isAoe;
+	int size;
 	vector<Effect> effects;
-	Spell(string _name, int _manaCost, int _value, SpellType _type) : name(_name), manaCost(_manaCost), value(_value), type(_type) {}
+	Spell(string _name, int _manaCost, int _value, SpellType _type) : name(_name), manaCost(_manaCost), value(_value), type(_type), isAoe(false) {}
+	Spell(string _name, int _manaCost, int _value, SpellType _type, bool aoe, int _size) : Spell(_name, _manaCost, _value, _type) {
+		isAoe = aoe;
+		size = _size;
+	}
 	void cast(Entity& caster, Entity& target);
+	void cast(Entity& caster, vector<Entity*>& targets);
 };
+
+class Item{};
 
 class Entity {
 public:
@@ -49,6 +58,8 @@ public:
 	bool isPlayer = false;
 	int initiative;
 	vector<Spell> spells;
+	vector<Effect> activeEffects;
+	vector<Item> inventory;
 
 	Entity(string _name, int _hp = 100, int _mana = 100, int _dmg = 10, int _teamId = 1, bool player = false) : name(_name), hp(_hp), maxHp(_hp), mana(_mana), maxMana(_mana), dmg(_dmg), teamId(_teamId), isPlayer(player) {}
 
@@ -79,6 +90,27 @@ void Spell::cast(Entity& caster, Entity& target) {
 			target.takeDamage(value);
 			cout << caster.name << " damaged " << target.name << " on " << value << " hp.\n";
 		}
+	}
+}
+
+void Spell::cast(Entity& caster, vector<Entity*>& targets) {
+	switch (type) {
+	case HEAL:
+		for(auto& e : targets)
+			if (caster.mana >= manaCost && e->hp < e->maxHp) {
+				caster.mana -= manaCost;
+				e->hp += value;
+				if (e->hp > e->maxHp) e->hp = e->maxHp;
+				cout << caster.name << " healed " << e->name << " on " << value << " hp.\n";
+		}
+		break;
+	case DAMAGE:
+		for(auto& e : targets)
+			if (caster.mana >= manaCost && e->hp > 0) {
+				caster.mana -= manaCost;
+				e->takeDamage(value);
+				cout << caster.name << " damaged " << e->name << " on " << value << " hp.\n";
+			}
 	}
 }
 
@@ -123,7 +155,7 @@ public:
 	}
 private:
 	vector<Entity> entities;
-	bool hasEscaped;
+	bool hasEscaped = false;
 
 	void rollInitiatve() {
 		for (auto& e : entities)
@@ -169,6 +201,47 @@ private:
 		}
 	}
 
+	vector<Entity*> selectTargets(int size, int teamId, bool enemy) {
+		vector<Entity*> targets;
+		vector<Entity*> available;
+		int index = 1;
+		for (auto& e : entities) {
+			if (enemy) {
+				if (e.teamId != teamId && e.hp > 0) {
+					cout << index++ << ". " << e.name << " (" << e.hp << "HP)\n";
+					available.push_back(&e);
+				}
+			}
+			else {
+				if (e.teamId == teamId && e.hp > 0) {
+					cout << index++ << ". " << e.name << " (" << e.hp << "HP)\n";
+					available.push_back(&e);
+				}
+			}
+		}
+		if (available.size() < size)
+			size = available.size();
+		int ch = 0;
+		while (targets.size() < size) {
+			cout << "Введите цель: ";
+			cin >> ch;
+			if (ch < 1 || ch > available.size()) {
+				cout << "Некорректный ввод";
+				continue;
+			}
+
+			Entity* selected = available[ch - 1];
+
+			if (find(targets.begin(), targets.end(), selected) != targets.end()); {
+				cout << "Цель уже выбрана\n";
+				continue;
+			}
+
+			targets.push_back(selected);
+		}
+		return targets;
+	}
+
 	void displaySpells(Entity& caster) {
 		if (caster.spells.empty()) {
 			cout << "У вас нет заклинаний\n";
@@ -177,7 +250,10 @@ private:
 
 		int index = 1;
 		for (auto& s : caster.spells)
-			cout << index++ << ". " << s.name << ' ' << s.manaCost << " MP\n";
+			if(s.isAoe)
+				cout << index++ << ". " << s.name << ' ' << s.manaCost << " MP. Количество целей: " << s.size << '\n';
+			else
+				cout << index++ << ". " << s.name << ' ' << s.manaCost << " MP\n";
 	}
 
 	void playerTurn(Entity& player) {
@@ -217,14 +293,27 @@ private:
 					break;
 				}
 
-				if (player.spells[spellChoice - 1].type == DAMAGE) {
-					Entity* target = selectTarget(0, true);
-					player.spells[spellChoice - 1].cast(player, *target);
-				}
+				if (player.spells[spellChoice-1].isAoe) {
+					if (player.spells[spellChoice - 1].type == DAMAGE) {
+						vector<Entity*> targets = selectTargets(player.spells[spellChoice - 1].size, 0, true);
+						player.spells[spellChoice - 1].cast(player, targets);
+					}
 
-				if (player.spells[spellChoice - 1].type == HEAL) {
-					Entity* target = selectTarget(0, false);
-					player.spells[spellChoice - 1].cast(player, *target);
+					if (player.spells[spellChoice - 1].type == HEAL) {
+						vector<Entity*> targets = selectTargets(player.spells[spellChoice-1].size, 0, false);
+						player.spells[spellChoice - 1].cast(player, targets);
+					}
+				}
+				else {
+					if (player.spells[spellChoice - 1].type == DAMAGE) {
+						Entity* target = selectTarget(0, true);
+						player.spells[spellChoice - 1].cast(player, *target);
+					}
+
+					if (player.spells[spellChoice - 1].type == HEAL) {
+						Entity* target = selectTarget(0, false);
+						player.spells[spellChoice - 1].cast(player, *target);
+					}
 				}
 
 				action = true;
@@ -265,7 +354,7 @@ private:
 	bool isBattleOver() {
 		set<int> teamsCount;
 		for (auto& e : entities)
-			if (e.hp > 0)
+			if(e.hp > 0)
 				teamsCount.insert(e.teamId);
 		return teamsCount.size() <= 1;
 	}
@@ -279,9 +368,12 @@ int main() {
 	Spell fireball("Fireball", 20, 15, DAMAGE);
 	Spell smallHeal("Small healing", 10, 5, HEAL);
 
+	Spell big_fireball("Big Fireball", 50, 30, DAMAGE, true, 3);
+
 	Entity player("Player", 20, 100, 10, 0, true);
 	player.spells.push_back(fireball);
 	player.spells.push_back(smallHeal);
+	player.spells.push_back(big_fireball);
 	Entity enemy("Enemy", 20, 0, 10);
 
 	BattleManager manager;
