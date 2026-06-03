@@ -13,16 +13,22 @@ enum SpellType {
 };
 
 enum EffectType {
-	PERIODIC, // heal, damage
-	CONTROL // оглушение, восприимчивость и др
+	DOT, // damage over time
+	HOT // heal over time
 };
 
 class Entity;
 
 class Effect {
+public:
+	string name;
 	int duration;
 	int value;
 	EffectType type;
+	bool hasExpired = false;
+
+	Effect(string _name, int _duration, int _value, EffectType _type) : name(_name), duration(_duration), value(_value), type(_type) {}
+
 	void apply(Entity& target);
 };
 
@@ -42,6 +48,10 @@ public:
 	}
 	void cast(Entity& caster, Entity& target);
 	void cast(Entity& caster, vector<Entity*>& targets);
+
+	void addEffect(Effect effect) {
+		effects.push_back(effect);
+	}
 };
 
 class Item{};
@@ -72,7 +82,44 @@ public:
 	void setInitiative() {
 		initiative = rand() % 6 + 1;
 	}
+	
+	void applyEffects() {
+		vector<Effect> remain;
+		for (auto& e : activeEffects) {
+			e.apply(*this);
+			if (e.hasExpired)
+				continue;
+			remain.push_back(e);
+		}
+		activeEffects = remain;
+	}
 };
+
+void Effect::apply(Entity& target) {
+	switch (type) {
+	case DOT: {
+		if (target.hp > 0) {
+			target.takeDamage(value);
+			cout << target.name << " suffers from " << name << " in amount of " << value << " dmg\n";
+		}
+		duration--;
+		if (duration == 0)
+			hasExpired = true;
+		break;
+	}
+	case HOT: {
+		if (target.hp > 0 && target.hp < target.maxHp) {
+			target.hp += value;
+			if (target.hp > target.maxHp) target.hp = target.maxHp;
+			cout << target.name << " heales from " << name << " in amount of " << value << " HP\n";
+		}
+		duration--;
+		if (duration == 0)
+			hasExpired = true;
+		break;
+	}
+	}
+}
 
 void Spell::cast(Entity& caster, Entity& target) {
 	switch (type) {
@@ -86,10 +133,20 @@ void Spell::cast(Entity& caster, Entity& target) {
 		break;
 	case DAMAGE:
 		if (caster.mana >= manaCost && target.hp > 0) {
-			caster.mana -= manaCost;
-			target.takeDamage(value);
-			cout << caster.name << " damaged " << target.name << " on " << value << " hp.\n";
+					caster.mana -= manaCost;
+					target.takeDamage(value);
+					cout << caster.name << " damaged " << target.name << " on " << value << " hp.\n";
 		}
+		break;
+	case EFFECT:
+		if (caster.mana >= manaCost && target.hp > 0) {
+			caster.mana -= manaCost;
+			for (auto& e : this->effects) {
+				target.activeEffects.push_back(e);
+				cout << caster.name << " uses " << e.name << " on " << target.name << '\n';
+			}
+		}
+		break;
 	}
 }
 
@@ -232,7 +289,7 @@ private:
 
 			Entity* selected = available[ch - 1];
 
-			if (find(targets.begin(), targets.end(), selected) != targets.end()); {
+			if (find(targets.begin(), targets.end(), selected) != targets.end()) {
 				cout << "Цель уже выбрана\n";
 				continue;
 			}
@@ -257,6 +314,7 @@ private:
 	}
 
 	void playerTurn(Entity& player) {
+		player.applyEffects();
 		int num;
 		bool action{ false };
 		while (action == false) {
@@ -305,7 +363,7 @@ private:
 					}
 				}
 				else {
-					if (player.spells[spellChoice - 1].type == DAMAGE) {
+					if (player.spells[spellChoice - 1].type == DAMAGE || player.spells[spellChoice - 1].type == EFFECT) {
 						Entity* target = selectTarget(0, true);
 						player.spells[spellChoice - 1].cast(player, *target);
 					}
@@ -341,6 +399,7 @@ private:
 	}
 
 	void aiTurn(Entity& current) {
+		current.applyEffects();
 		for (auto& e : entities) {
 			if (e.teamId != current.teamId && e.hp > 0) {
 				e.takeDamage(current.dmg);
@@ -365,15 +424,23 @@ int main() {
 
 	srand(time({}));
 
+	Effect posion_effect("Posion", 2, 5, DOT);
+	Effect burn("Burn", 2, 7, DOT);
+
 	Spell fireball("Fireball", 20, 15, DAMAGE);
+	fireball.addEffect(burn);
 	Spell smallHeal("Small healing", 10, 5, HEAL);
 
 	Spell big_fireball("Big Fireball", 50, 30, DAMAGE, true, 3);
 
-	Entity player("Player", 20, 100, 10, 0, true);
+	Spell poison("Posion", 20, 0, EFFECT);
+	poison.addEffect(posion_effect);
+
+	Entity player("Player", 50, 100, 10, 0, true);
 	player.spells.push_back(fireball);
 	player.spells.push_back(smallHeal);
 	player.spells.push_back(big_fireball);
+	player.spells.push_back(poison);
 	Entity enemy("Enemy", 20, 0, 10);
 
 	BattleManager manager;
