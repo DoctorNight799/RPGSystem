@@ -128,14 +128,14 @@ void Spell::cast(Entity& caster, Entity& target) {
 			caster.mana -= manaCost;
 			target.hp += value;
 			if (target.hp > target.maxHp) target.hp = target.maxHp;
-			cout << caster.name << " healed " << target.name << " on " << value << " hp.\n";
+			cout << caster.name << " used " << name << " on " << target.name << " for " << value << " hp.\n";
 		}
 		break;
 	case DAMAGE:
 		if (caster.mana >= manaCost && target.hp > 0) {
-					caster.mana -= manaCost;
-					target.takeDamage(value);
-					cout << caster.name << " damaged " << target.name << " on " << value << " hp.\n";
+			caster.mana -= manaCost;
+			target.takeDamage(value);
+			cout << caster.name << " used " << name << " on " << target.name << " for " << value << " hp.\n";
 		}
 		break;
 	case EFFECT:
@@ -153,21 +153,25 @@ void Spell::cast(Entity& caster, Entity& target) {
 void Spell::cast(Entity& caster, vector<Entity*>& targets) {
 	switch (type) {
 	case HEAL:
-		for(auto& e : targets)
-			if (caster.mana >= manaCost && e->hp < e->maxHp) {
-				caster.mana -= manaCost;
+		if (caster.mana > manaCost) {
+			cout << caster.name << " used " << name << '\n';
+			caster.mana -= manaCost;
+			for (auto& e : targets) {
 				e->hp += value;
 				if (e->hp > e->maxHp) e->hp = e->maxHp;
-				cout << caster.name << " healed " << e->name << " on " << value << " hp.\n";
-		}
-		break;
-	case DAMAGE:
-		for(auto& e : targets)
-			if (caster.mana >= manaCost && e->hp > 0) {
-				caster.mana -= manaCost;
-				e->takeDamage(value);
-				cout << caster.name << " damaged " << e->name << " on " << value << " hp.\n";
+				cout << e->name << " healed on " << value << " hp\n";
 			}
+			break;
+	case DAMAGE:
+		if (caster.mana > manaCost) {
+			cout << caster.name << " used " << name << '\n';
+			caster.mana -= manaCost;
+			for (auto& e : targets) {
+				e->takeDamage(value);
+				cout << e->name << " damaged on " << value << " hp\n";
+			}
+		}
+		}
 	}
 }
 
@@ -400,13 +404,37 @@ private:
 
 	void aiTurn(Entity& current) {
 		current.applyEffects();
+		Entity* weakest = nullptr; // указатель так как иначе будет копия
+		int lowestHp = 99999;
+		bool usedSpell = false;
+
 		for (auto& e : entities) {
 			if (e.teamId != current.teamId && e.hp > 0) {
-				e.takeDamage(current.dmg);
-				cout << "Enemy dealt " << current.dmg << " damage to " << e.name << '\n';
-				break;
+				if (e.hp < lowestHp) {
+					lowestHp = e.hp;
+					weakest = &e;
+				}
+					
 			}
 		}
+
+		if (weakest == nullptr) return;
+
+		if (!current.spells.empty()) {
+			for (auto& s : current.spells)
+				if ((s.type == DAMAGE || s.type == EFFECT) && !s.isAoe) {
+					if (current.mana >= s.manaCost) {
+						s.cast(current, *weakest);
+						usedSpell = true;
+						break;
+					}
+				}
+		}
+		if(!usedSpell) {
+			weakest->takeDamage(current.dmg);
+			cout << current.name << " dealt " << current.dmg << " damage to " << weakest->name << '\n';
+		}
+
 		cout << endl;
 	}
 
@@ -436,17 +464,24 @@ int main() {
 	Spell poison("Posion", 20, 0, EFFECT);
 	poison.addEffect(posion_effect);
 
-	Entity player("Player", 50, 100, 10, 0, true);
+	Entity player("Player", 40, 100, 10, 0, true);
 	player.spells.push_back(fireball);
 	player.spells.push_back(smallHeal);
 	player.spells.push_back(big_fireball);
 	player.spells.push_back(poison);
-	Entity enemy("Enemy", 20, 0, 10);
+
+	Entity enemy("Enemy", 30, 50, 10);
+	enemy.spells.push_back(fireball);
+
+	Entity enemy2("Enemy2", 30, 0, 10);
+	Entity ally("Ally", 25, 0, 10, 0);
 
 	BattleManager manager;
 
 	manager.addEntity(player);
 	manager.addEntity(enemy);
+	manager.addEntity(enemy2);
+	manager.addEntity(ally);
 
 	manager.startBattle();
 }
