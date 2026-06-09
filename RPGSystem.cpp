@@ -100,7 +100,7 @@ void Effect::apply(Entity& target) {
 	case DOT: {
 		if (target.hp > 0) {
 			target.takeDamage(value);
-			cout << target.name << " suffers from " << name << " in amount of " << value << " dmg\n";
+			cout << target.name << " страдает от " << name << " в размере " << value << " ХП\n";
 		}
 		duration--;
 		if (duration == 0)
@@ -111,7 +111,7 @@ void Effect::apply(Entity& target) {
 		if (target.hp > 0 && target.hp < target.maxHp) {
 			target.hp += value;
 			if (target.hp > target.maxHp) target.hp = target.maxHp;
-			cout << target.name << " heales from " << name << " in amount of " << value << " HP\n";
+			cout << target.name << " исцеляется благодаря " << name << " в размере " << value << " ХП\n";
 		}
 		duration--;
 		if (duration == 0)
@@ -122,31 +122,33 @@ void Effect::apply(Entity& target) {
 }
 
 void Spell::cast(Entity& caster, Entity& target) {
-	switch (type) {
-	case HEAL:
-		if (caster.mana >= manaCost && target.hp < target.maxHp) {
-			caster.mana -= manaCost;
-			target.hp += value;
-			if (target.hp > target.maxHp) target.hp = target.maxHp;
-			cout << caster.name << " used " << name << " on " << target.name << " for " << value << " hp.\n";
-		}
-		break;
-	case DAMAGE:
-		if (caster.mana >= manaCost && target.hp > 0) {
-			caster.mana -= manaCost;
-			target.takeDamage(value);
-			cout << caster.name << " used " << name << " on " << target.name << " for " << value << " hp.\n";
-		}
-		break;
-	case EFFECT:
-		if (caster.mana >= manaCost && target.hp > 0) {
-			caster.mana -= manaCost;
-			for (auto& e : this->effects) {
-				target.activeEffects.push_back(e);
-				cout << caster.name << " uses " << e.name << " on " << target.name << '\n';
+	if (caster.mana >= manaCost) {
+		switch (type) {
+		case HEAL:
+			if (target.hp < target.maxHp) {
+				caster.mana -= manaCost;
+				target.hp += value;
+				if (target.hp > target.maxHp) target.hp = target.maxHp;
+				cout << caster.name << " использует " << name << " на " << target.name << " в размере " << value << " ХП\n";
 			}
+			break;
+		case DAMAGE:
+			if (target.hp > 0) {
+				caster.mana -= manaCost;
+				target.takeDamage(value);
+				cout << caster.name << " использует " << name << " на " << target.name << " в размере " << value << " ХП\n";
+			}
+			break;
+		case EFFECT:
+			if (target.hp > 0) {
+				caster.mana -= manaCost;
+				for (auto& e : this->effects) {
+					target.activeEffects.push_back(e);
+					cout << caster.name << " использует " << e.name << " на " << target.name << '\n';
+				}
+			}
+			break;
 		}
-		break;
 	}
 }
 
@@ -154,21 +156,21 @@ void Spell::cast(Entity& caster, vector<Entity*>& targets) {
 	switch (type) {
 	case HEAL:
 		if (caster.mana > manaCost) {
-			cout << caster.name << " used " << name << '\n';
+			cout << caster.name << " использовал " << name << '\n';
 			caster.mana -= manaCost;
 			for (auto& e : targets) {
 				e->hp += value;
 				if (e->hp > e->maxHp) e->hp = e->maxHp;
-				cout << e->name << " healed on " << value << " hp\n";
+				cout << e->name << " исцелил на " << value << " ХП\n";
 			}
 			break;
 	case DAMAGE:
 		if (caster.mana > manaCost) {
-			cout << caster.name << " used " << name << '\n';
+			cout << caster.name << " использовал " << name << '\n';
 			caster.mana -= manaCost;
 			for (auto& e : targets) {
 				e->takeDamage(value);
-				cout << e->name << " damaged on " << value << " hp\n";
+				cout << e->name << " нанес урон в размере " << value << " ХП\n";
 			}
 		}
 		}
@@ -207,12 +209,14 @@ public:
 				}
 			}
 		}
+		string win = "Бой окончен. Победили ";
 		for (auto& e : entities) {
 			if (e.hp > 0) {
-				cout << "Бой окончен. Победитель: " << e.name << '\n';
-				break;
+				win += e.name;
+				win += ' ';
 			}
 		}
+		cout << win;
 	}
 private:
 	vector<Entity> entities;
@@ -240,13 +244,13 @@ private:
 		for (auto& e : entities) {
 			if (enemy) {
 				if (e.teamId != teamId && e.hp > 0) {
-					cout << index++ << ". " << e.name << " (" << e.hp << " HP)\n";
+					cout << index++ << ". " << e.name << " (" << e.hp << " ХП)\n";
 					targets.push_back(&e);
 				}
 			}
 			else {
 				if (e.teamId == teamId && e.hp > 0) {
-					cout << index++ << ". " << e.name << " (" << e.hp << " HP)\n";
+					cout << index++ << ". " << e.name << " (" << e.hp << " ХП)\n";
 					targets.push_back(&e);
 				}
 			}
@@ -269,13 +273,13 @@ private:
 		for (auto& e : entities) {
 			if (enemy) {
 				if (e.teamId != teamId && e.hp > 0) {
-					cout << index++ << ". " << e.name << " (" << e.hp << "HP)\n";
+					cout << index++ << ". " << e.name << " (" << e.hp << "ХП)\n";
 					available.push_back(&e);
 				}
 			}
 			else {
 				if (e.teamId == teamId && e.hp > 0) {
-					cout << index++ << ". " << e.name << " (" << e.hp << "HP)\n";
+					cout << index++ << ". " << e.name << " (" << e.hp << "ХП)\n";
 					available.push_back(&e);
 				}
 			}
@@ -287,7 +291,7 @@ private:
 			cout << "Введите цель: ";
 			cin >> ch;
 			if (ch < 1 || ch > available.size()) {
-				cout << "Некорректный ввод";
+				cout << "Некорректный ввод\n";
 				continue;
 			}
 
@@ -318,6 +322,7 @@ private:
 	}
 
 	void playerTurn(Entity& player) {
+		cout << "-------- Ход игрока --------\n";
 		player.applyEffects();
 		int num;
 		bool action{ false };
@@ -334,7 +339,7 @@ private:
 				Entity* target = selectTarget(0, true);
 				if (target) {
 					target->takeDamage(player.dmg);
-					cout << "Player dealt " << player.dmg << " damage to " << target->name << '\n';
+					cout << "\nИгрок нанес " << player.dmg << " урона " << target->name << '\n';
 				}
 				else {
 					cout << " Нет доступных целей\n";
@@ -397,42 +402,67 @@ private:
 				break;
 			}
 			default:
-				cout << "Incorrect action\n" << endl;
+				cout << "Неправильное действие\n" << endl;
 			}
 		}
 	}
 
 	void aiTurn(Entity& current) {
+		const double THRESHOLD_HP = 0.4;
+		const double THRESHOLD_PLAYER = 0.5;
+		cout << "-------- Ход " << current.name << " --------\n";
 		current.applyEffects();
-		Entity* weakest = nullptr; // указатель так как иначе будет копия
+		Entity* weakest = nullptr; // указатель, иначе будет копия
+		Entity* struggling = nullptr;
 		int lowestHp = 99999;
+		int lowestHpAlly = 99999;
 		bool usedSpell = false;
 
 		for (auto& e : entities) {
+			if (e.teamId == current.teamId && e.hp > 0) {
+				double precent = (double)e.hp / e.maxHp;
+				if (e.isPlayer) {
+					if (precent < THRESHOLD_PLAYER && e.hp < lowestHpAlly) {
+						struggling = &e;
+						lowestHpAlly = e.hp;
+					}
+				}
+				else {
+					if (precent < THRESHOLD_HP && e.hp < lowestHpAlly){
+						struggling = &e;
+						lowestHpAlly = e.hp;
+					}
+				}
+			}
 			if (e.teamId != current.teamId && e.hp > 0) {
 				if (e.hp < lowestHp) {
 					lowestHp = e.hp;
 					weakest = &e;
 				}
-					
 			}
 		}
 
 		if (weakest == nullptr) return;
 
 		if (!current.spells.empty()) {
-			for (auto& s : current.spells)
-				if ((s.type == DAMAGE || s.type == EFFECT) && !s.isAoe) {
-					if (current.mana >= s.manaCost) {
+			for(auto& s : current.spells)
+				if(struggling != nullptr)
+					if (s.type == HEAL && !s.isAoe) {
+						s.cast(current, *struggling);
+						usedSpell = true;
+						break;
+					}
+			if(!usedSpell)
+				for(auto& s : current.spells)
+					if ((s.type == DAMAGE || s.type == EFFECT) && !s.isAoe) {
 						s.cast(current, *weakest);
 						usedSpell = true;
 						break;
 					}
-				}
 		}
 		if(!usedSpell) {
 			weakest->takeDamage(current.dmg);
-			cout << current.name << " dealt " << current.dmg << " damage to " << weakest->name << '\n';
+			cout << current.name << " нанес " << current.dmg << " урона " << weakest->name << '\n';
 		}
 
 		cout << endl;
